@@ -1,0 +1,79 @@
+{
+  "components": {
+    "vision": {
+      "enabled": true,
+      "model": "apple/FastVLM-0.5B-fp16",
+      "device": "auto",
+      "fps_range": [0.5, 10.0],
+      "adaptive_sampling": true,
+      "capture_mode": "full_screen"
+    },
+    "voice": {
+      "enabled": true,
+      "stt_model": "base",
+      "language": "en",
+      "vad_aggressiveness": 2,
+      "energy_threshold": 0.01,
+      "tts_voice": "default",
+      "tts_rate": 180
+    },
+    "memory": {
+      "enabled": true,
+      "persist_dir": "./porter_memory",
+      "max_short_term": 100,
+      "max_long_term": 10000,
+      "consolidation_threshold": 0.7,
+      "importance_decay": 0.95
+    },
+    "message_bus": {
+      "pub_port": 5555,
+      "sub_port": 5556,
+      "enable_persistence": true
+    },
+    "llm": {
+      "model": "local",
+      "local_model_name": "llama-3.2-3b",
+      "max_context": 4096,
+      "temperature": 0.7,
+      "streaming": true
+    }
+  },
+  "pipeline": {
+    "max_workers": 4,
+    "queue_size": 100,
+    "batch_size": 5,
+    "timeout": 30.0,
+    "circuit_breaker_threshold": 5
+  },
+  "intelligence": {
+    "min_confidence": 0.6,
+    "interruption_threshold": 0.7,
+    "min_interruption_interval": 60.0,
+    "advice_types": ["tip", "warning", "suggestion", "error_help", "workflow", "shortcut"],
+    "proactive_mode": true
+  },
+  "performance": {
+    "max_cpu_percent": 80,
+    "max_memory_mb": 8192,
+    "gpu_memory_fraction": 0.5,
+    "enable_profiling": false,
+    "log_level": "INFO"
+  },
+  "privacy": {
+    "store_screenshots": false,
+    "store_conversations": true,
+    "data_retention_days": 30,
+    "anonymize_data": false,
+    "excluded_applications": ["1Password", "Banking"],
+    "excluded_regions": []
+  },
+  "ui": {
+    "system_tray": true,
+    "hotkeys": {
+      "toggle_listening": "cmd+shift+l",
+      "toggle_vision": "cmd+shift+v",
+      "clear_context": "cmd+shift+c"
+    },
+    "notifications": true
+  }
+}

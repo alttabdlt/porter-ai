@@ -1,0 +1,44 @@
+# Porter.AI Real Implementation Dependencies
+
+# Screen Capture
+mss>=9.0.0                    # Cross-platform screen capture
+Pillow>=10.0.0               # Image processing
+scikit-image>=0.22.0         # SSIM calculation for change detection
+opencv-python>=4.8.0         # Advanced image processing
+
+# Vision-Language Model (Choose one option)
+# Option A: Apple Silicon Optimized
+mlx>=0.5.0                   # Apple MLX framework
+mlx-lm>=0.5.0               # MLX language models
+
+# Option B: Cross-platform
+# transformers>=4.35.0       # Hugging Face transformers
+# onnxruntime>=1.16.0       # ONNX runtime for inference
+# torch>=2.0.0              # PyTorch backend
+
+# Voice Interface
+openai-whisper>=20230918    # OpenAI Whisper for STT
+# Alternative: faster-whisper>=0.10.0  # Faster Whisper implementation
+pyttsx3>=2.90               # Text-to-speech
+pyaudio>=0.2.11             # Audio I/O
+webrtcvad>=2.0.10          # Voice Activity Detection
+SpeechRecognition>=3.10.0  # Speech recognition wrapper
+
+# Memory & Intelligence
+chromadb>=0.4.0             # Vector database
+sentence-transformers>=2.2.0 # Embeddings generation
+numpy>=1.24.0               # Numerical operations
+
+# Web Dashboard
+aiohttp>=3.9.0              # Async HTTP server
+aiohttp-cors>=0.7.0        # CORS support
+websockets>=12.0           # WebSocket support
+
+# Utilities
+python-dotenv>=1.0.0       # Environment variables
+pydantic>=2.0.0           # Data validation
+tqdm>=4.65.0              # Progress bars
+colorama>=0.4.6           # Colored terminal output
+
+# Optional: Local LLM for responses
+# llama-cpp-python>=0.2.0   # Local LLama model support
