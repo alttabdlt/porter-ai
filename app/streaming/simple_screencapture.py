@@ -21,12 +21,41 @@ logger = logging.getLogger(__name__)
 class SimpleScreenCapture:
     """Simplified screen capture using ScreenCaptureKit"""
     
-    def __init__(self, fps: int = 10):
+    def __init__(self, fps: int = 10, display_index: int = 0):
         self.fps = fps
+        self.display_index = display_index
         self.stream: Optional[SC.SCStream] = None
         self.is_running = False
         self.frame_callback: Optional[Callable] = None
         self.frames_captured = 0
+        self.selected_display_index = None
+        self.selected_display = None
+    
+    def enumerate_displays(self, content):
+        """
+        Enumerate all available displays and return their information.
+        
+        Args:
+            content: SCShareableContent object
+            
+        Returns:
+            List of display information dictionaries
+        """
+        displays = content.displays() if callable(content.displays) else content.displays
+        display_info = []
+        
+        logger.info(f"Found {len(displays)} display(s):")
+        for i, display in enumerate(displays):
+            info = {
+                'index': i,
+                'width': display.width,
+                'height': display.height,
+                'display_object': display
+            }
+            display_info.append(info)
+            logger.info(f"  Display {i}: {display.width}x{display.height}")
+        
+        return display_info
         
     async def initialize(self):
         """Initialize the stream"""
@@ -51,9 +80,21 @@ class SimpleScreenCapture:
                 logger.error("No displays available")
                 return False
             
-            # Use primary display
-            display = displays[0]
-            logger.info(f"Using display: {display}")
+            # Enumerate all displays
+            display_info = self.enumerate_displays(content)
+            
+            # Validate and select display by index
+            if self.display_index >= len(displays):
+                logger.warning(f"Display index {self.display_index} not found (only {len(displays)} displays available)")
+                logger.warning(f"Falling back to display 0")
+                self.selected_display_index = 0
+            else:
+                self.selected_display_index = self.display_index
+            
+            # Use selected display
+            display = displays[self.selected_display_index]
+            self.selected_display = display
+            logger.info(f"Using display {self.selected_display_index}: {display.width}x{display.height}")
             
             # Create stream configuration
             config = SC.SCStreamConfiguration.alloc().init()

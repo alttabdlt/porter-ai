@@ -11,6 +11,7 @@ import psutil
 import os
 import subprocess
 import signal
+import argparse
 from typing import Optional, Dict, Any
 import numpy as np
 from pathlib import Path
@@ -29,9 +30,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import streaming components
-from simple_screencapture import SimpleScreenCapture
-from screencapture_kit import AdaptiveFrameSampler
-from context_fusion import ContextFusion
+from streaming.simple_screencapture import SimpleScreenCapture
+from streaming.screencapture_kit import AdaptiveFrameSampler
+from streaming.context_fusion import ContextFusion
 
 # Import server for WebSocket
 from backend.server import DashboardServer
@@ -62,6 +63,7 @@ class StreamingPipeline:
         self.config = config or {}
         
         # Core components
+        self.display_index = config.get('display_index', 0)
         self.stream: Optional[SimpleScreenCapture] = None
         self.sampler = AdaptiveFrameSampler(base_fps=10)
         self.context_fusion = ContextFusion()
@@ -102,7 +104,7 @@ class StreamingPipeline:
         # Initialize stream
         fps = self.config.get('fps', 30)
         
-        self.stream = SimpleScreenCapture(fps=fps)
+        self.stream = SimpleScreenCapture(fps=fps, display_index=self.display_index)
         self.stream.set_frame_callback(self._handle_frame)
         
         # Initialize VLM if available
@@ -357,6 +359,28 @@ class StreamingPipeline:
         }
 
 
+def parse_arguments(args=None):
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(description='Porter.AI Streaming Intelligence')
+    parser.add_argument('--display', type=int, default=0,
+                       help='Display index to capture (default: 0 for primary display)')
+    parser.add_argument('--fps', type=int, default=10,
+                       help='Frames per second for capture (default: 10)')
+    parser.add_argument('--width', type=int, default=1920,
+                       help='Capture width (default: 1920)')
+    parser.add_argument('--height', type=int, default=1080,
+                       help='Capture height (default: 1080)')
+    parser.add_argument('--no-vlm', action='store_true',
+                       help='Disable VLM processing')
+    
+    # Validate display argument
+    parsed_args = parser.parse_args(args)
+    if parsed_args.display < 0:
+        parser.error("Display index cannot be negative")
+    
+    return parsed_args
+
+
 def cleanup_port(port: int = 8001):
     """Kill any process using the specified port"""
     try:
@@ -383,6 +407,9 @@ def cleanup_port(port: int = 8001):
 
 async def main():
     """Main entry point for streaming pipeline"""
+    # Parse command-line arguments
+    args = parse_arguments()
+    
     # Clean up ports before starting
     cleanup_port(8001)
     cleanup_port(8000)
@@ -391,15 +418,18 @@ async def main():
     print("🚀 PORTER.AI STREAMING INTELLIGENCE")
     print("="*60)
     print("\nInitializing real-time streaming pipeline...")
+    print(f"Display: {args.display} | FPS: {args.fps} | Resolution: {args.width}x{args.height}")
     print("Components: ScreenCaptureKit → FastVLM → Context")
     print("-"*60 + "\n")
     
-    # Create pipeline
+    # Create pipeline with command-line arguments
     pipeline = StreamingPipeline({
-        'width': 1920,
-        'height': 1080,
-        'fps': 10,  # Reduced from 60 to lower CPU usage
-        'show_cursor': True
+        'display_index': args.display,
+        'width': args.width,
+        'height': args.height,
+        'fps': args.fps,
+        'show_cursor': True,
+        'use_vlm': not args.no_vlm
     })
     
     try:
