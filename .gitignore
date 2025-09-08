@@ -93,9 +93,7 @@ Thumbs.db
 .directory
 
 # Large model checkpoints and unnecessary files
-ml-fastvlm/checkpoints/
-ml-fastvlm/venv_export/
-ml-fastvlm/download.log
+ml-fastvlm/
 mlx-vlm-patched/
 Screenshot*.png
 benchmark_comparison.py
