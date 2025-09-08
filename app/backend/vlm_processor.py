@@ -94,7 +94,7 @@ class ROIResult:
 class FastVLMProcessor:
     """Apple FastVLM-0.5B processor using MLX for Apple Silicon"""
     
-    def __init__(self, model_name: str = "apple/FastVLM-0.5B-fp16"):
+    def __init__(self, model_name: str = None):
         """
         Initialize Apple FastVLM-0.5B processor
         
@@ -107,11 +107,21 @@ class FastVLMProcessor:
         - InsightKeeper/FastVLM-0.5B-MLX-6bit (community MLX version)
         - Or Qwen2-VL as a last resort
         """
-        self.model_name = model_name
+        # Use local converted FastVLM model
+        import os
+        base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        local_model_path = os.path.join(base_path, "ml-fastvlm/models/fastvlm-0.5b-mlx")
+        
+        if model_name is None and os.path.exists(local_model_path):
+            self.model_name = local_model_path
+            logger.info(f"Using local FastVLM model at: {local_model_path}")
+        else:
+            self.model_name = model_name or "apple/FastVLM-0.5B-fp16"
         self.model = None
         self.processor = None
         self.config = None
         self.initialized = False
+        self.last_description = None  # Track previous description for context
         
         logger.info(f"Initializing VLM processor with model: {model_name}")
         
@@ -129,15 +139,19 @@ class FastVLMProcessor:
         # Lazy load MLX modules
         _lazy_load_mlx()
         
+        # Only try FastVLM models, skip Qwen2-VL to avoid API mismatch
         fallback_models = [
-            self.model_name,  # Primary: apple/FastVLM-0.5B-fp16
-            "InsightKeeper/FastVLM-0.5B-MLX-6bit",  # Community MLX version
-            "mlx-community/Qwen2-VL-2B-Instruct-4bit",  # Last resort fallback
+            self.model_name,  # Primary: Local FastVLM or specified model
         ]
+        
+        # Add community version only if local doesn't exist
+        import os
+        if not os.path.exists(self.model_name):
+            fallback_models.append("InsightKeeper/FastVLM-0.5B-MLX-6bit")
         
         for model_name in fallback_models:
             try:
-                logger.info(f"Loading model {model_name}...")
+                logger.info(f"Loading FastVLM model {model_name}...")
                 start_time = time.time()
                 
                 # Load model and processor
@@ -145,12 +159,13 @@ class FastVLMProcessor:
                 self.config = self.model.config
                 
                 load_time = time.time() - start_time
-                logger.info(f"Model {model_name} loaded successfully in {load_time:.2f} seconds")
+                logger.info(f"FastVLM model {model_name} loaded successfully in {load_time:.2f} seconds")
+                logger.info(f"Model type: {getattr(self.config, 'model_type', 'unknown')}")
                 self.model_name = model_name  # Update to the successfully loaded model
                 return
                 
             except Exception as e:
-                logger.warning(f"Failed to load {model_name}: {e}")
+                logger.warning(f"Failed to load FastVLM {model_name}: {e}")
                 # Clean up memory after failed attempt
                 self.model = None
                 self.processor = None
@@ -161,8 +176,8 @@ class FastVLMProcessor:
                 continue
         
         # If all models failed to load
-        logger.error("All model loading attempts failed")
-        logger.info("Falling back to mock mode...")
+        logger.error("Failed to load FastVLM model - descriptions will not be available")
+        logger.error("Please ensure ml-fastvlm/models/fastvlm-0.5b-mlx exists and is properly converted")
         self.model = None
             
     async def describe_screen(self, frame: np.ndarray, prompt: Optional[str] = None) -> str:
@@ -178,15 +193,29 @@ class FastVLMProcessor:
         """
         # Ensure model is loaded
         if not self.initialized:
+            logger.debug("VLM not initialized, initializing...")
             await self.initialize()
             
         # If model failed to load, use mock description
         if self.model is None:
+            logger.warning("No VLM model loaded, returning mock description")
             return self._mock_description()
             
-        # Default prompt for screen description
+        # Enhanced prompt for better accuracy with context
         if prompt is None:
-            prompt = "Describe what the user is doing on this screen in one sentence."
+            base_prompt = """Describe what the user is doing in detail. Include:
+- The application being used
+- The specific task or activity
+- Any visible text or UI elements
+Be specific and concise in one sentence."""
+            
+            # Add context from previous frame if available
+            if self.last_description:
+                prompt = f"Previous: {self.last_description[:80]}...\nNow: {base_prompt}"
+            else:
+                prompt = base_prompt
+            
+        logger.debug(f"Describing screen with prompt: {prompt[:100]}...")
             
         # Convert numpy array to PIL Image
         if isinstance(frame, np.ndarray):
@@ -197,7 +226,14 @@ class FastVLMProcessor:
         # Generate description
         try:
             description = await self._generate_async(image, prompt)
-            return description
+            if description and description != "No description available":
+                logger.info(f"VLM generated: {description[:100]}...")
+                # Store for context in next frame
+                self.last_description = description
+                return description
+            else:
+                logger.warning("VLM returned empty/invalid description, using fallback")
+                return self._mock_description()
         except Exception as e:
             logger.error(f"Error generating description: {e}")
             return self._mock_description()
@@ -219,25 +255,46 @@ class FastVLMProcessor:
         image.save(temp_path)
         
         try:
-            # Format prompt for MLX-LM (simpler than VLM)
-            formatted_prompt = f"<image>\n{prompt}"
+            # Format prompt using Qwen2 conversation template (like CLI that works)
+            formatted_prompt = (
+                "<|im_start|>system\n"
+                "You are a helpful assistant.<|im_end|>\n"
+                "<|im_start|>user\n"
+                "<image>\n"
+                f"{prompt}<|im_end|>\n"
+                "<|im_start|>assistant\n"
+            )
             
-            # Generate description
+            logger.debug(f"Generating with prompt: {prompt[:50]}...")
+            
+            # Generate description (no return_type parameter)
             output = generate(
                 self.model, 
                 self.processor, 
                 formatted_prompt, 
                 str(temp_path), 
                 verbose=False,
-                max_tokens=100,
-                temperature=0.7
+                max_tokens=150,  # Increased for more detailed descriptions
+                temperature=0.5  # Lower for more consistent output
             )
             
-            # Extract text from GenerationResult object
-            if hasattr(output, 'text'):
-                return output.text
-            else:
-                return str(output)
+            # Extract text from output
+            result = str(output) if output else ""
+            
+            # Clean up the output (remove any template markers)
+            if "<|im_end|>" in result:
+                result = result.split("<|im_end|>")[0]
+            if "<|im_start|>" in result:
+                result = result.split("<|im_start|>")[-1]
+            
+            result = result.strip()
+            logger.info(f"Generated description: {result[:100]}...")
+            
+            return result if result else "No description available"
+            
+        except Exception as e:
+            logger.error(f"Generation failed: {e}")
+            return "No description available"
             
         finally:
             # Clean up temp file

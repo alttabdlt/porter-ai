@@ -91,3 +91,11 @@ site/
 # System
 Thumbs.db
 .directory
+
+# Large model checkpoints and unnecessary files
+ml-fastvlm/checkpoints/
+ml-fastvlm/venv_export/
+ml-fastvlm/download.log
+mlx-vlm-patched/
+Screenshot*.png
+benchmark_comparison.py

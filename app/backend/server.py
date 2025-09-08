@@ -31,6 +31,7 @@ class DashboardServer:
         # Serve the dashboard HTML
         self.app.router.add_get('/', self.serve_dashboard)
         self.app.router.add_get('/dashboard', self.serve_dashboard)
+        self.app.router.add_get('/streaming', self.serve_streaming_dashboard)
         
         # Serve screenshot images (if needed)
         self.app.router.add_get('/screenshot/{filename}', self.serve_screenshot)
@@ -57,6 +58,16 @@ class DashboardServer:
             return web.Response(text=content, content_type='text/html')
         else:
             return web.Response(text='Dashboard not found', status=404)
+    
+    async def serve_streaming_dashboard(self, request):
+        """Serve the streaming dashboard HTML"""
+        streaming_path = Path(__file__).parent.parent / 'frontend' / 'streaming.html'
+        if streaming_path.exists():
+            with open(streaming_path, 'r') as f:
+                content = f.read()
+            return web.Response(text=content, content_type='text/html')
+        else:
+            return web.Response(text='Streaming dashboard not found', status=404)
             
     async def serve_screenshot(self, request):
         """Serve screenshot images"""
@@ -169,7 +180,7 @@ class DashboardServer:
     async def start(self):
         """Start both HTTP and WebSocket servers"""
         # Start WebSocket server
-        ws_server = await websockets.serve(
+        self.ws_server = await websockets.serve(
             self.websocket_handler,
             self.host,
             self.ws_port
@@ -177,13 +188,26 @@ class DashboardServer:
         logger.info(f"WebSocket server started on ws://{self.host}:{self.ws_port}")
         
         # Start HTTP server
-        runner = web.AppRunner(self.app)
-        await runner.setup()
-        site = web.TCPSite(runner, self.host, self.http_port)
-        await site.start()
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
+        self.site = web.TCPSite(self.runner, self.host, self.http_port)
+        await self.site.start()
         logger.info(f"HTTP server started on http://{self.host}:{self.http_port}")
         
-        return ws_server
+        return self.ws_server
+    
+    async def stop(self):
+        """Stop both HTTP and WebSocket servers"""
+        # Close WebSocket server
+        if hasattr(self, 'ws_server'):
+            self.ws_server.close()
+            await self.ws_server.wait_closed()
+        
+        # Close HTTP server
+        if hasattr(self, 'site'):
+            await self.site.stop()
+        if hasattr(self, 'runner'):
+            await self.runner.cleanup()
 
 async def main():
     """Standalone server for testing"""

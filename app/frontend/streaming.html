@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porter.AI - Streaming Intelligence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', 'Monaco', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            grid-template-rows: 60px 1fr 120px;
+            gap: 10px;
+            height: 100vh;
+            padding: 10px;
+        }
+        
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(26, 26, 46, 0.8);
+            border: 1px solid #00ff88;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #00ff88;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .metric-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+        }
+        
+        /* Main Stream View */
+        .stream-container {
+            background: rgba(26, 26, 46, 0.6);
+            border: 1px solid #333;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #streamCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .overlay-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .ocr-overlay {
+            position: absolute;
+            border: 2px solid #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 10px;
+            color: #00ff88;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+        
+        .saliency-overlay {
+            position: absolute;
+            border: 2px dashed #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 4px;
+            pointer-events: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Intelligence Panel */
+        .intelligence-panel {
+            background: rgba(26, 26, 46, 0.8);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .intel-section {
+            background: rgba(40, 40, 60, 0.6);
+            border-radius: 6px;
+            padding: 10px;
+        }
+        
+        .intel-title {
+            color: #00ff88;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .confidence-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ffd93d, #00ff88);
+            transition: width 0.3s ease;
+        }
+        
+        .entity-tag {
+            display: inline-block;
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid #00ff88;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            margin: 2px;
+        }
+        
+        .activity-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Timeline */
+        .timeline {
+            grid-column: 1 / -1;
+            background: rgba(26, 26, 46, 0.8);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow-x: auto;
+        }
+        
+        .timeline-event {
+            min-width: 80px;
+            height: 80px;
+            background: rgba(40, 40, 60, 0.8);
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .timeline-event:hover {
+            transform: translateY(-2px);
+            border-color: #00ff88;
+        }
+        
+        .timeline-time {
+            font-size: 10px;
+            color: #888;
+        }
+        
+        .timeline-activity {
+            font-size: 11px;
+            color: #00ff88;
+        }
+        
+        .timeline-importance {
+            height: 3px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .timeline-importance-fill {
+            height: 100%;
+            background: #00ff88;
+        }
+        
+        /* Performance Graph */
+        .perf-graph {
+            width: 100%;
+            height: 60px;
+            background: rgba(40, 40, 60, 0.4);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .perf-line {
+            stroke: #00ff88;
+            stroke-width: 2;
+            fill: none;
+            filter: drop-shadow(0 0 3px rgba(0, 255, 136, 0.5));
+        }
+        
+        .perf-grid {
+            stroke: #333;
+            stroke-width: 1;
+        }
+        
+        /* Connection Status */
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(26, 26, 46, 0.9);
+            border: 1px solid #333;
+            border-radius: 20px;
+            padding: 5px 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff6b6b;
+        }
+        
+        .status-dot.connected {
+            background: #00ff88;
+            animation: pulse-dot 2s infinite;
+        }
+        
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header with metrics -->
+        <div class="header">
+            <h1 class="title">🚀 PORTER.AI STREAMING</h1>
+            <div class="status-bar">
+                <div class="metric">
+                    <div class="metric-value" id="fps">0</div>
+                    <div class="metric-label">FPS</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="latency">0</div>
+                    <div class="metric-label">Latency (ms)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="cpu">0</div>
+                    <div class="metric-label">CPU %</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="memory">0</div>
+                    <div class="metric-label">Memory (MB)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main stream view -->
+        <div class="stream-container">
+            <canvas id="streamCanvas"></canvas>
+            <div class="overlay-container" id="overlayContainer"></div>
+        </div>
+        
+        <!-- Intelligence panel -->
+        <div class="intelligence-panel">
+            <!-- Context Section -->
+            <div class="intel-section">
+                <div class="intel-title">
+                    <span class="activity-indicator"></span>
+                    CONTEXT FUSION
+                </div>
+                <div id="contextDescription">Initializing streaming intelligence...</div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceBar" style="width: 0%"></div>
+                </div>
+                <div id="activityType" style="color: #888; font-size: 11px;">Activity: Unknown</div>
+            </div>
+            
+            <!-- OCR Section -->
+            <div class="intel-section">
+                <div class="intel-title">📝 TEXT DETECTION</div>
+                <div id="ocrText" style="font-size: 11px; color: #aaa;">No text detected</div>
+            </div>
+            
+            <!-- UI Tree Section -->
+            <div class="intel-section">
+                <div class="intel-title">🎯 UI FOCUS</div>
+                <div id="uiApp" style="font-size: 12px;">App: Unknown</div>
+                <div id="uiFocus" style="font-size: 11px; color: #aaa;">No focus element</div>
+            </div>
+            
+            <!-- Entities Section -->
+            <div class="intel-section">
+                <div class="intel-title">🏷️ KEY ENTITIES</div>
+                <div id="entities"></div>
+            </div>
+            
+            <!-- Performance Graph -->
+            <div class="intel-section">
+                <div class="intel-title">📊 PERFORMANCE</div>
+                <svg class="perf-graph" id="perfGraph">
+                    <defs>
+                        <linearGradient id="perfGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00ff88;stop-opacity:0.3" />
+                            <stop offset="100%" style="stop-color:#00ff88;stop-opacity:0" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+        </div>
+        
+        <!-- Timeline removed - was showing redundant "browsing" events -->
+    </div>
+    
+    <!-- Connection status -->
+    <div class="connection-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+    </div>
+    
+    <script>
+        // WebSocket connection
+        let ws = null;
+        let connected = false;
+        
+        // Canvas setup
+        const canvas = document.getElementById('streamCanvas');
+        const ctx = canvas.getContext('2d');
+        let frameBuffer = null;
+        
+        // Performance tracking
+        let fpsHistory = [];
+        let latencyHistory = [];
+        const maxHistory = 60;
+        
+        // Timeline events
+        const timelineEvents = [];
+        const maxTimelineEvents = 20;
+        
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8001/ws');
+            
+            ws.onopen = () => {
+                console.log('Connected to streaming server');
+                connected = true;
+                updateConnectionStatus(true);
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleStreamMessage(data);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                console.log('Disconnected from streaming server');
+                connected = false;
+                updateConnectionStatus(false);
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+        
+        function handleStreamMessage(message) {
+            switch(message.type) {
+                case 'frame':
+                    renderFrame(message.data);
+                    break;
+                case 'metrics':
+                    updateMetrics(message.data);
+                    break;
+                case 'context':
+                    updateContext(message.data);
+                    break;
+                case 'ocr':
+                    updateOCR(message.data);
+                    break;
+                case 'ui_tree':
+                    updateUITree(message.data);
+                    break;
+                case 'saliency':
+                    updateSaliency(message.data);
+                    break;
+            }
+        }
+        
+        function renderFrame(frameData) {
+            // Display real frame from backend
+            if (frameData && frameData.image) {
+                const img = new Image();
+                img.onload = function() {
+                    // Resize canvas to match container
+                    const containerWidth = canvas.clientWidth;
+                    const containerHeight = canvas.clientHeight;
+                    const imgAspect = img.width / img.height;
+                    const containerAspect = containerWidth / containerHeight;
+                    
+                    let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+                    
+                    if (imgAspect > containerAspect) {
+                        // Image is wider
+                        drawWidth = containerWidth;
+                        drawHeight = containerWidth / imgAspect;
+                        offsetY = (containerHeight - drawHeight) / 2;
+                    } else {
+                        // Image is taller
+                        drawHeight = containerHeight;
+                        drawWidth = containerHeight * imgAspect;
+                        offsetX = (containerWidth - drawWidth) / 2;
+                    }
+                    
+                    canvas.width = containerWidth;
+                    canvas.height = containerHeight;
+                    
+                    // Clear canvas
+                    ctx.fillStyle = '#0a0a0a';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Draw image centered
+                    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                };
+                img.src = frameData.image;
+                frameCount++;
+            }
+        }
+        
+        function updateMetrics(metrics) {
+            document.getElementById('fps').textContent = metrics.fps?.toFixed(0) || '0';
+            document.getElementById('latency').textContent = metrics.latency?.toFixed(0) || '0';
+            document.getElementById('cpu').textContent = metrics.cpu?.toFixed(1) || '0';
+            document.getElementById('memory').textContent = metrics.memory?.toFixed(0) || '0';
+            
+            // Update performance graph
+            fpsHistory.push(metrics.fps || 0);
+            if (fpsHistory.length > maxHistory) fpsHistory.shift();
+            updatePerfGraph();
+        }
+        
+        function updateContext(context) {
+            document.getElementById('contextDescription').textContent = context.description || 'Processing...';
+            document.getElementById('confidenceBar').style.width = `${(context.confidence || 0) * 100}%`;
+            document.getElementById('activityType').textContent = `Activity: ${context.activity_type || 'Unknown'}`;
+            
+            // Update entities
+            const entitiesDiv = document.getElementById('entities');
+            entitiesDiv.innerHTML = '';
+            (context.key_entities || []).forEach(entity => {
+                const tag = document.createElement('span');
+                tag.className = 'entity-tag';
+                tag.textContent = entity;
+                entitiesDiv.appendChild(tag);
+            });
+            
+            // Timeline removed - was redundant
+        }
+        
+        function updateOCR(ocrData) {
+            const ocrText = document.getElementById('ocrText');
+            if (ocrData.text && ocrData.text.length > 0) {
+                // Show up to 5 text regions for better visibility
+                const displayText = ocrData.text.slice(0, 5).join(' | ');
+                ocrText.textContent = displayText.length > 100 
+                    ? displayText.substring(0, 100) + '...' 
+                    : displayText;
+            } else {
+                ocrText.textContent = 'No significant text detected';
+            }
+            
+            // Draw OCR overlays (if needed for debugging)
+            // drawOCROverlays(ocrData.regions || []);
+        }
+        
+        function updateUITree(uiData) {
+            document.getElementById('uiApp').textContent = `App: ${uiData.app_name || 'Unknown'}`;
+            if (uiData.focused_element) {
+                document.getElementById('uiFocus').textContent = 
+                    `Focus: ${uiData.focused_element.role} - ${uiData.focused_element.value || 'No value'}`;
+            }
+        }
+        
+        function updateSaliency(saliencyData) {
+            // Draw saliency regions
+            drawSaliencyOverlays(saliencyData.regions || []);
+        }
+        
+        function drawOCROverlays(regions) {
+            const container = document.getElementById('overlayContainer');
+            // Remove old OCR overlays
+            container.querySelectorAll('.ocr-overlay').forEach(el => el.remove());
+            
+            regions.forEach(region => {
+                const overlay = document.createElement('div');
+                overlay.className = 'ocr-overlay';
+                overlay.style.left = `${region.x * 100}%`;
+                overlay.style.top = `${region.y * 100}%`;
+                overlay.style.width = `${region.width * 100}%`;
+                overlay.style.height = `${region.height * 100}%`;
+                overlay.textContent = region.text?.substring(0, 20);
+                container.appendChild(overlay);
+            });
+        }
+        
+        function drawSaliencyOverlays(regions) {
+            // Saliency overlays removed - red boxes were just visual clutter
+            // Not providing useful information to the user
+        }
+        
+        // Timeline function removed - was showing redundant activity spam
+        
+        function updatePerfGraph() {
+            const svg = document.getElementById('perfGraph');
+            const width = svg.clientWidth;
+            const height = svg.clientHeight;
+            
+            // Clear previous
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="perfGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#00ff88;stop-opacity:0.3" />
+                        <stop offset="100%" style="stop-color:#00ff88;stop-opacity:0" />
+                    </linearGradient>
+                </defs>
+            `;
+            
+            if (fpsHistory.length < 2) return;
+            
+            // Create path
+            const maxFps = Math.max(...fpsHistory, 60);
+            const points = fpsHistory.map((fps, i) => {
+                const x = (i / (maxHistory - 1)) * width;
+                const y = height - (fps / maxFps) * height;
+                return `${x},${y}`;
+            }).join(' ');
+            
+            // Draw filled area
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            path.setAttribute('points', `0,${height} ${points} ${width},${height}`);
+            path.setAttribute('fill', 'url(#perfGradient)');
+            svg.appendChild(path);
+            
+            // Draw line
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            line.setAttribute('points', points);
+            line.setAttribute('class', 'perf-line');
+            svg.appendChild(line);
+        }
+        
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Disconnected';
+            }
+        }
+        
+        // Initialize
+        connectWebSocket();
+        
+        // Resize canvas on window resize
+        window.addEventListener('resize', () => {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+        });
+    </script>
+</body>
+</html>
