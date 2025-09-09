@@ -250,56 +250,62 @@ Be specific and concise in one sentence."""
         
     def _generate_sync(self, image: Image.Image, prompt: str) -> str:
         """Generate description synchronously"""
-        # Save image temporarily (mlx-vlm needs file path)
-        temp_path = Path("temp_screen.jpg")
-        image.save(temp_path)
+        import io
+        import tempfile
         
-        try:
-            # Format prompt using Qwen2 conversation template (like CLI that works)
-            formatted_prompt = (
-                "<|im_start|>system\n"
-                "You are a helpful assistant.<|im_end|>\n"
-                "<|im_start|>user\n"
-                "<image>\n"
-                f"{prompt}<|im_end|>\n"
-                "<|im_start|>assistant\n"
-            )
+        # Use in-memory bytes buffer instead of disk file
+        with io.BytesIO() as buffer:
+            # Save image to memory buffer
+            image.save(buffer, format='JPEG', quality=85)
+            buffer.seek(0)
             
-            logger.debug(f"Generating with prompt: {prompt[:50]}...")
-            
-            # Generate description (no return_type parameter)
-            output = generate(
-                self.model, 
-                self.processor, 
-                formatted_prompt, 
-                str(temp_path), 
-                verbose=False,
-                max_tokens=150,  # Increased for more detailed descriptions
-                temperature=0.5  # Lower for more consistent output
-            )
-            
-            # Extract text from output
-            result = str(output) if output else ""
-            
-            # Clean up the output (remove any template markers)
-            if "<|im_end|>" in result:
-                result = result.split("<|im_end|>")[0]
-            if "<|im_start|>" in result:
-                result = result.split("<|im_start|>")[-1]
-            
-            result = result.strip()
-            logger.info(f"Generated description: {result[:100]}...")
-            
-            return result if result else "No description available"
-            
-        except Exception as e:
-            logger.error(f"Generation failed: {e}")
-            return "No description available"
-            
-        finally:
-            # Clean up temp file
-            if temp_path.exists():
-                temp_path.unlink()
+            # Create temporary file that auto-deletes
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=True) as temp_file:
+                # Write buffer to temp file
+                temp_file.write(buffer.getvalue())
+                temp_file.flush()
+                
+                try:
+                    # Format prompt for exam proctoring focus
+                    formatted_prompt = (
+                        "<|im_start|>system\n"
+                        "You are an exam proctor assistant. Identify any suspicious behavior.<|im_end|>\n"
+                        "<|im_start|>user\n"
+                        "<image>\n"
+                        f"{prompt}<|im_end|>\n"
+                        "<|im_start|>assistant\n"
+                    )
+                    
+                    logger.debug(f"Generating with prompt: {prompt[:50]}...")
+                    
+                    # Generate description
+                    output = generate(
+                        self.model, 
+                        self.processor, 
+                        formatted_prompt, 
+                        temp_file.name,  # Use temp file path
+                        verbose=False,
+                        max_tokens=100,  # Reduced for faster inference
+                        temperature=0.3  # Lower for more consistent detection
+                    )
+                    
+                    # Extract text from output
+                    result = str(output) if output else ""
+                    
+                    # Clean up the output
+                    if "<|im_end|>" in result:
+                        result = result.split("<|im_end|>")[0]
+                    if "<|im_start|>" in result:
+                        result = result.split("<|im_start|>")[-1]
+                    
+                    result = result.strip()
+                    logger.debug(f"Generated: {result[:100]}...")
+                    
+                    return result if result else "No description available"
+                    
+                except Exception as e:
+                    logger.error(f"Generation failed: {e}")
+                    return "No description available"
                 
     def _mock_description(self) -> str:
         """Fallback mock descriptions when model not available"""
