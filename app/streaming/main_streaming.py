@@ -64,7 +64,7 @@ def get_vlm_processor():
     """Get the appropriate VLM processor based on platform and configuration"""
     
     # Check if we should use FastVLM (Apple Silicon only)
-    if IS_MACOS and os.getenv("USE_FASTVLM", "false").lower() == "true":
+    if IS_MACOS and os.getenv("USE_FASTVLM", "true").lower() == "true":
         try:
             from backend.vlm_processor import FastVLMProcessor
             logger.info("Using FastVLM processor (Apple Silicon optimized)")
@@ -73,7 +73,7 @@ def get_vlm_processor():
             logger.warning("FastVLM not available on this system")
     
     # Check if we should use OmniVLM (cross-platform)
-    if os.getenv("USE_OMNIVLM", "true").lower() == "true":
+    if os.getenv("USE_OMNIVLM", "false").lower() == "true":
         try:
             from vlm_processors.omnivlm_processor import OmniVLMProcessor
             logger.info("Using OmniVLM processor (cross-platform)")
@@ -480,7 +480,7 @@ async def main():
     print("="*60)
     print("\nInitializing real-time streaming pipeline...")
     print(f"Display: {args.display} | FPS: {args.fps} | Resolution: {args.width}x{args.height}")
-    print("Components: ScreenCaptureKit → FastVLM → Context")
+    print(f"Components: ScreenCapture → {VLMProcessor.__name__} → Context Fusion")
     print("-"*60 + "\n")
     
     # Create pipeline with command-line arguments
