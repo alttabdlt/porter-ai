@@ -2,6 +2,7 @@
 """
 Main streaming pipeline integration.
 Orchestrates all components for real-time intelligent screen monitoring.
+Supports cross-platform execution with automatic platform detection.
 """
 
 import asyncio
@@ -9,6 +10,7 @@ import logging
 import time
 import psutil
 import os
+import platform
 import subprocess
 import signal
 import argparse
@@ -29,28 +31,69 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Import streaming components
-from streaming.simple_screencapture import SimpleScreenCapture
+# Platform detection
+SYSTEM = platform.system()
+IS_MACOS = SYSTEM == "Darwin"
+IS_WINDOWS = SYSTEM == "Windows"
+IS_LINUX = SYSTEM == "Linux"
+
+logger.info(f"Running on {SYSTEM} platform")
+
+# Import capture module based on platform
+if IS_MACOS and os.getenv("USE_NATIVE_CAPTURE", "false").lower() == "true":
+    try:
+        from streaming.simple_screencapture import SimpleScreenCapture
+        CAPTURE_MODE = "native_macos"
+        logger.info("Using native macOS screen capture")
+    except ImportError:
+        from capture.cross_platform_capture import CrossPlatformCapture as SimpleScreenCapture
+        CAPTURE_MODE = "cross_platform"
+        logger.info("Falling back to cross-platform capture")
+else:
+    from capture.cross_platform_capture import CrossPlatformCapture as SimpleScreenCapture
+    CAPTURE_MODE = "cross_platform"
+    logger.info("Using cross-platform screen capture")
+
+# Import other components
 from streaming.screencapture_kit import AdaptiveFrameSampler
 from streaming.context_fusion import ContextFusion
-
-# Import server for WebSocket
 from backend.server import DashboardServer
 
-# Import VLM processor
-try:
-    from backend.vlm_processor import FastVLMProcessor
-    VLM_AVAILABLE = True
-    logger.info("FastVLM processor available")
-except ImportError:
-    logger.warning("FastVLM not available, using simplified processor")
-    # Fall back to simple processor if VLM fails
+# Import VLM processor based on platform and configuration
+def get_vlm_processor():
+    """Get the appropriate VLM processor based on platform and configuration"""
+    
+    # Check if we should use FastVLM (Apple Silicon only)
+    if IS_MACOS and os.getenv("USE_FASTVLM", "false").lower() == "true":
+        try:
+            from backend.vlm_processor import FastVLMProcessor
+            logger.info("Using FastVLM processor (Apple Silicon optimized)")
+            return FastVLMProcessor
+        except ImportError:
+            logger.warning("FastVLM not available on this system")
+    
+    # Check if we should use OmniVLM (cross-platform)
+    if os.getenv("USE_OMNIVLM", "true").lower() == "true":
+        try:
+            from vlm_processors.omnivlm_processor import OmniVLMProcessor
+            logger.info("Using OmniVLM processor (cross-platform)")
+            return OmniVLMProcessor
+        except ImportError:
+            logger.warning("OmniVLM not available, install transformers")
+    
+    # Fall back to simple processor
     try:
-        from backend.simple_processor import SimplifiedVLMProcessor as FastVLMProcessor
+        from backend.simple_processor import SimplifiedVLMProcessor
+        logger.info("Using simplified processor (no ML models)")
+        return SimplifiedVLMProcessor
     except ImportError:
-        # If simple_processor doesn't exist yet, use the one from vlm_processor
-        from backend.vlm_processor import SimplifiedVLMProcessor as FastVLMProcessor
-    VLM_AVAILABLE = False
+        from backend.vlm_processor import SimplifiedVLMProcessor
+        logger.info("Using fallback simplified processor")
+        return SimplifiedVLMProcessor
+
+# Get the VLM processor class
+VLMProcessor = get_vlm_processor()
+VLM_AVAILABLE = VLMProcessor.__name__ != "SimplifiedVLMProcessor"
 
 class StreamingPipeline:
     """
@@ -73,8 +116,9 @@ class StreamingPipeline:
         self.use_vlm = config.get('use_vlm', True)  # Enable VLM by default
         if self.use_vlm:
             try:
-                self.vlm = FastVLMProcessor()
-                logger.info(f"VLM processor initialized (Full={VLM_AVAILABLE})")
+                self.vlm = VLMProcessor()
+                logger.info(f"VLM processor initialized ({VLMProcessor.__name__})")
+                logger.info(f"ML models available: {VLM_AVAILABLE}")
             except Exception as e:
                 logger.warning(f"Failed to initialize VLM: {e}")
                 self.vlm = None
@@ -100,11 +144,28 @@ class StreamingPipeline:
     async def initialize(self):
         """Initialize all components"""
         logger.info("Initializing streaming pipeline...")
+        logger.info(f"Platform: {SYSTEM}")
+        logger.info(f"VLM Backend: {VLMProcessor.__name__}")
+        logger.info(f"Capture Mode: {CAPTURE_MODE}")
         
         # Initialize stream
         fps = self.config.get('fps', 30)
         
-        self.stream = SimpleScreenCapture(fps=fps, display_index=self.display_index)
+        # Configure capture based on mode
+        if CAPTURE_MODE == "cross_platform":
+            from capture.cross_platform_capture import CaptureConfig, CaptureMode
+            capture_config = CaptureConfig(
+                mode=CaptureMode.PRIMARY_MONITOR,
+                fps=fps,
+                width=self.config.get('width', 1920),
+                height=self.config.get('height', 1080),
+                monitor_index=self.display_index + 1  # mss uses 1-based indexing
+            )
+            self.stream = SimpleScreenCapture(capture_config)
+        else:
+            # Native macOS capture
+            self.stream = SimpleScreenCapture(fps=fps, display_index=self.display_index)
+        
         self.stream.set_frame_callback(self._handle_frame)
         
         # Initialize VLM if available

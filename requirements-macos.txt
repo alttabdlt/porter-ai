@@ -1,0 +1,37 @@
+# Porter.AI macOS Requirements
+# Optimized for Apple Silicon (M1/M2/M3/M4) and Intel Macs
+
+# Include base requirements
+-r requirements-base.txt
+
+# Apple Silicon Optimization (Optional - for FastVLM)
+# Uncomment these if you want to use Apple's FastVLM
+# mlx>=0.5.0                   # Apple MLX framework
+# mlx-lm>=0.5.0               # MLX language models
+# mlx-vlm>=0.0.11             # MLX vision-language models
+
+# macOS-specific screen capture
+pyobjc-framework-ScreenCaptureKit>=10.0  # Native ScreenCaptureKit
+pyobjc-framework-CoreMedia>=10.0         # Media framework
+pyobjc-framework-Quartz>=10.0            # Display services
+pyobjc-framework-AVFoundation>=10.0      # Audio/Video
+
+# Audio support for macOS
+pyaudio>=0.2.11              # Audio I/O
+# Note: Install with: brew install portaudio && pip install pyaudio
+
+# macOS-specific performance
+py-applescript>=1.0.3        # AppleScript integration
+mac-say>=2020.12.3          # Native TTS support
+
+# Metal Performance Shaders (MPS) for PyTorch
+# PyTorch with MPS support is included in base requirements
+# Use device="mps" for Apple Silicon GPU acceleration
+
+# Optional: CoreML for optimized inference
+# coremltools>=7.0            # Convert models to CoreML
+
+# Installation notes for macOS:
+# 1. For ScreenCaptureKit: Requires macOS 12.3+
+# 2. For MLX: Requires Apple Silicon (M1/M2/M3/M4)
+# 3. Grant screen recording permissions in System Preferences

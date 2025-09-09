@@ -1,0 +1,27 @@
+# Porter.AI Windows Requirements
+# Optimized for Windows 10/11 systems
+
+# Include base requirements
+-r requirements-base.txt
+
+# Windows-specific optimizations
+onnxruntime>=1.16.0          # Optimized inference on Windows
+onnxruntime-gpu>=1.16.0      # GPU acceleration (if NVIDIA GPU available)
+
+# Audio support for Windows
+pyaudio>=0.2.11              # Audio I/O (may need Visual C++ Build Tools)
+# Alternative: sounddevice>=0.4.6  # Easier to install on Windows
+
+# Windows-specific performance tools
+py-cpuinfo>=9.0.0           # CPU information
+GPUtil>=1.4.0               # GPU monitoring (if available)
+
+# Optional: DirectML for Windows ML acceleration
+# onnxruntime-directml>=1.16.0  # Windows ML acceleration
+
+# Optional: Better terminal output on Windows
+windows-curses>=2.3.0       # Better terminal UI support
+
+# Note: For PyAudio on Windows, you may need to:
+# 1. Install Visual C++ Build Tools
+# 2. Or use pre-built wheels: pip install pipwin && pipwin install pyaudio

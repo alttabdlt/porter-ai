@@ -1,0 +1,36 @@
+# Porter.AI Base Requirements - Common across all platforms
+# Core dependencies that work on Windows, macOS, and Linux
+
+# Screen Capture (Cross-platform)
+mss>=9.0.0                    # Cross-platform screen capture
+Pillow>=10.0.0               # Image processing
+opencv-python>=4.8.0         # Advanced image processing
+scikit-image>=0.22.0         # SSIM calculation for change detection
+
+# Vision-Language Models (Cross-platform)
+transformers>=4.35.0         # Hugging Face transformers
+torch>=2.0.0                 # PyTorch backend
+huggingface-hub>=0.20.0     # Model downloading
+accelerate>=0.25.0           # Optimized inference
+sentencepiece>=0.1.99        # Tokenization for some models
+
+# Memory & Intelligence
+chromadb>=0.4.0             # Vector database
+sentence-transformers>=2.2.0 # Embeddings generation
+numpy>=1.24.0               # Numerical operations
+
+# Web Dashboard
+aiohttp>=3.9.0              # Async HTTP server
+aiohttp-cors>=0.7.0        # CORS support
+websockets>=12.0           # WebSocket support
+
+# Utilities
+python-dotenv>=1.0.0       # Environment variables
+pydantic>=2.0.0           # Data validation
+tqdm>=4.65.0              # Progress bars
+colorama>=0.4.6           # Colored terminal output
+psutil>=5.9.0             # System monitoring
+
+# Testing
+pytest>=7.0.0             # Testing framework
+pytest-asyncio>=0.21.0    # Async test support

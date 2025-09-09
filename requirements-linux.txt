@@ -1,0 +1,45 @@
+# Porter.AI Linux Requirements
+# Optimized for Ubuntu/Debian-based systems
+
+# Include base requirements
+-r requirements-base.txt
+
+# Linux-specific optimizations
+onnxruntime>=1.16.0          # Optimized inference
+onnxruntime-gpu>=1.16.0      # GPU acceleration (if NVIDIA GPU available)
+
+# Audio support for Linux
+pyaudio>=0.2.11              # Audio I/O
+# Note: Install system dependencies first:
+# sudo apt-get install portaudio19-dev python3-pyaudio
+
+# Linux display support (for headless servers)
+pyvirtualdisplay>=3.0       # Virtual display for headless systems
+# Note: Requires Xvfb: sudo apt-get install xvfb
+
+# Linux-specific performance tools
+py-cpuinfo>=9.0.0           # CPU information
+nvidia-ml-py>=12.535.0      # NVIDIA GPU monitoring (if available)
+
+# Optional: TensorRT for NVIDIA GPUs
+# tensorrt>=8.6.0            # NVIDIA TensorRT optimization
+
+# Optional: ROCm for AMD GPUs
+# torch-rocm>=2.0.0          # PyTorch with ROCm support
+
+# System dependencies to install (Ubuntu/Debian):
+# sudo apt-get update
+# sudo apt-get install -y \
+#   python3-dev \
+#   portaudio19-dev \
+#   xvfb \
+#   libgl1-mesa-glx \
+#   libglib2.0-0 \
+#   libsm6 \
+#   libxext6 \
+#   libxrender-dev \
+#   libgomp1
+
+# For Docker/Codespaces:
+# Most dependencies are pre-installed
+# May need: apt-get install -y xvfb for virtual display
